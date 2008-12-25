@@ -1,0 +1,33 @@
+--- fastestmirror.py.old	2008-11-12 23:03:22.000000000 +0800
++++ fastestmirror.py	2008-12-25 14:01:01.000000000 +0800
+@@ -45,6 +45,7 @@
+ import urlparse
+ import datetime
+ import threading
++import urllib2
+ 
+ from yum.plugins import TYPE_CORE
+ 
+@@ -464,15 +465,14 @@
+                 if self.host in ("127.0.0.1", "::1", "localhost"):
+                     result = 0
+                 else:
+-                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+-                    uPort = string.find(self.host,":")
+-                    if uPort > 0:
+-                        self.port = int(self.host[uPort+1:])
+-                        self.host = self.host[:uPort]
+                     time_before = time.time()
+-                    sock.connect((self.host, self.port))
+-                    result = time.time() - time_before
+-                    sock.close()
++                    usock = urllib2.urlopen("%s/repodata/repomd.xml" % self.mirror)
++                    fsize =  len(usock.read())
++                    elapsed = time.time() - time_before
++                    result = (elapsed*10000) / fsize
++                    if 1:
++                       print "Timed %s %.1fKBps" % (self.host,fsize/elapsed/1024.0)
++
+             self.parent._add_result(self.mirror, self.host, result)
+         except:
+             if verbose:
