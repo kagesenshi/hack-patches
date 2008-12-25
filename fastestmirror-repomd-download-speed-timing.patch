@@ -31,7 +31,7 @@
 +                    elapsed = time.time() - time_before
 +                    result = (elapsed*10000) / fsize
 +                    if verbose:
-+                       print "Timed %s %.1fKBps" % (self.host,fsize/elapsed/1024.0)
++                       print "Timed %s (score: %.1f)" % (self.host,fsize/elapsed/1024.0)
 +
              self.parent._add_result(self.mirror, self.host, result)
          except:
