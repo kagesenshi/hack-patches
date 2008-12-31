@@ -22,10 +22,26 @@ class AxelGrabber(grabber.URLGrabber):
         opts = self.opts.derive(**kwargs)
         (url,parts) = opts.urlparser.parse(url, opts)
         (scheme, host, path, parm, query, frag) = parts
+        fsize = get_filesize(url)
+        if (fsize/1024) < 100:
+           parts = 1
+        elif (fsize/1024) < 500:
+           parts = 2
+        elif (fsize/1024/1024) < 1:
+           parts = 3
+        elif (fsize/1024/1024) < 5:
+           parts = 4
+        elif (fsize/1024/1024) < 10:
+           parts = 6
+        elif (fsize/1024/1024) < 15:
+           parts = 8
+        else:
+           parts = 10
 
+        if parts == 1:
+           return grabber.URLGrabber.urlgrab(self, url, filename=None, **kwargs)
 
-        def retryfunc(opts, url, filename):
-            fsize = get_filesize(url)
+        def retryfunc(opts, url, filename, parts):
             if (fsize/1024) < 100:
                parts = 1
             elif (fsize/1024) < 500:
@@ -49,4 +65,4 @@ class AxelGrabber(grabber.URLGrabber):
                raise grabber.URLGrabError(-1)
             return filename
  
-        return self._retry(opts, retryfunc, url, filename)
+        return self._retry(opts, retryfunc, url, filename, parts)
