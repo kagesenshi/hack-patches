@@ -42,20 +42,6 @@ class AxelGrabber(grabber.URLGrabber):
            return grabber.URLGrabber.urlgrab(self, url, filename=None, **kwargs)
 
         def retryfunc(opts, url, filename, parts):
-            if (fsize/1024) < 100:
-               parts = 1
-            elif (fsize/1024) < 500:
-               parts = 2
-            elif (fsize/1024/1024) < 1:
-               parts = 3
-            elif (fsize/1024/1024) < 5:
-               parts = 4
-            elif (fsize/1024/1024) < 10:
-               parts = 6
-            elif (fsize/1024/1024) < 15:
-               parts = 8
-            else:
-               parts = 10
             if os.path.exists(filename):
                if not os.path.exists("%s.st" % filename):
                   os.unlink(filename)
