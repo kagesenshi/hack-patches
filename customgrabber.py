@@ -11,7 +11,7 @@ def get_filesize(url):
         size = 0
     return float(size) 
 
-class AxelGrabber(grabber.URLGrabber):
+class AxelGrabber(grabber.URLGrabber,object):
    def urlgrab(self, url, filename=None, **kwargs):
         """grab the file at  and make a local copy at 
         If filename is none, the basename of the url is used.
@@ -39,7 +39,7 @@ class AxelGrabber(grabber.URLGrabber):
            parts = 10
 
         if parts == 1:
-           return grabber.URLGrabber.urlgrab(self, url, filename, **kwargs)
+           return super (AxelGrabber, self).urlgrab(url, filename, **kwargs)
 
         def retryfunc(opts, url, filename, parts):
             if os.path.exists(filename):
