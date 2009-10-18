@@ -1,5 +1,6 @@
---- fastestmirror.py.old	2008-11-12 23:03:22.000000000 +0800
-+++ fastestmirror.py	2008-12-25 16:27:29.000000000 +0800
+diff -ruN yum-utils-1.1.18.old/plugins/fastestmirror/fastestmirror.py yum-utils-1.1.18/plugins/fastestmirror/fastestmirror.py
+--- yum-utils-1.1.18.old/plugins/fastestmirror/fastestmirror.py	2008-12-25 16:45:42.000000000 +0800
++++ yum-utils-1.1.18/plugins/fastestmirror/fastestmirror.py	2008-12-25 16:46:30.000000000 +0800
 @@ -45,6 +45,7 @@
  import urlparse
  import datetime
