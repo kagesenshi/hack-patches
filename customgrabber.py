@@ -38,17 +38,17 @@ def axel_grabber_patch():
          (url,parts) = opts.urlparser.parse(url, opts)
          (scheme, host, path, parm, query, frag) = parts
          fsize = get_filesize(url)
-         if (fsize/1024) < 100:
+         if (fsize/1024/1024) < 1:
             parts = 1
-         elif (fsize/1024) < 500:
-            parts = 2
-         elif (fsize/1024/1024) < 1:
-            parts = 3
          elif (fsize/1024/1024) < 5:
-            parts = 4
+            parts = 2
          elif (fsize/1024/1024) < 10:
-            parts = 6
+            parts = 3
          elif (fsize/1024/1024) < 15:
+            parts = 4
+         elif (fsize/1024/1024) < 20:
+            parts = 6
+         elif (fsize/1024/1024) < 25:
             parts = 8
          else:
             parts = 10
@@ -71,5 +71,7 @@ def axel_grabber_patch():
     grabber.URLGrabber.urlgrab = urlgrab
     grabber._axel_grabber_patched = True
 
-axel_grabber_patch()
+
+def init_hook(conduit):
+    axel_grabber_patch()
 
