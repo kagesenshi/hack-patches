@@ -37,6 +37,10 @@ def axel_grabber_patch():
          opts = self.opts.derive(**kwargs)
          (url,parts) = opts.urlparser.parse(url, opts)
          (scheme, host, path, parm, query, frag) = parts
+
+         if 'file:///' in url:
+             return self._orig_urlgrab(url, filename, **kwargs)
+
          fsize = get_filesize(url)
          if (fsize/1024/1024) < 1:
             parts = 1
@@ -55,7 +59,7 @@ def axel_grabber_patch():
  
          if parts == 1:
             return self._orig_urlgrab(url, filename, **kwargs)
- 
+
          def retryfunc(opts, url, filename, parts):
              if os.path.exists(filename):
                 if not os.path.exists("%s.st" % filename):
