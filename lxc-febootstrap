@@ -160,7 +160,7 @@ create() {
     fi
 
     # the rootfs name will be build with the container name
-    ROOTFS="./rootfs.${NAME}"
+    ROOTFS="/var/lib/lxc/rootfs/${NAME}"
 
     # check if the rootfs does already exist
     if [ ! -e "${ROOTFS}" ]; then
