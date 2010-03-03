@@ -196,6 +196,9 @@ create() {
 
             # make a local copy of the mini
 	    echo -n "Copying rootfs ..."
+            if [ ! -e "/var/lib/lxc/rootfs" ];then
+               mkdir -p /var/lib/lxc/rootfs
+            fi
 	    cp -a ${CACHE}/rootfs ${ROOTFS} && echo "Done." || exit
 	) 200> "/var/lock/subsys/lxc"
     fi
@@ -319,7 +322,6 @@ if [ "$(id -u)" != "0" ]; then
 fi
 
 # Detect which executable we were run as, lxc-fedora or lxc-redhat
-DISTRO="fedora"
 CACHE="/var/cache/lxc/${DISTRO}"
 mkdir -p ${CACHE}
 
