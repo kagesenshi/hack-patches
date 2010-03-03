@@ -248,7 +248,7 @@ destroy() {
 	return ${RETVAL}
     fi
 
-    ROOTFS="./rootfs.${NAME}"
+    ROOTFS="/var/lib/lxc/rootfs/${NAME}"
 
     echo -n "Shall I remove the rootfs [y/n] ? "
     read
