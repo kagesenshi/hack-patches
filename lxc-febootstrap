@@ -321,6 +321,7 @@ fi
 # Detect which executable we were run as, lxc-fedora or lxc-redhat
 DISTRO="fedora"
 CACHE="/var/cache/lxc/${DISTRO}"
+mkdir -p ${CACHE}
 
 case "$1" in
     create)
