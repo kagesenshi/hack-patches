@@ -52,21 +52,3 @@ minimum_size 1920 18
 #
 TEXT
 ${voffset 5}    $nodename $kernel              CPU @${freq_g 1}/${freq_g 2} ${ibm_temps 0}C ${voffset -5}    ${cpugraph cpu0 12,50} ${cpugraph cpu1 12,20} ${cpugraph 12,20}${voffset 5}        Memory ${mem}/${memperc}% ${voffset -5}${memgraph 12,50}${voffset 5}          Wlan ${downspeed wlan0}/${upspeed wlan0} ${voffset -5}${downspeedgraph wlan0 12,50} ${upspeedgraph wlan0 12,50}
-#${image ~/.conky/background.png -p 0,0 }
-#${offset 20}${voffset -7}${font PF Tempesta Five Condensed:size=6:style=bold}${color2}[ ${color}$nodename   $kernel${color2} ]${color}${font}
-#${offset 35}${voffset 18}load  ${loadavg 1} ${loadavg 2} ${loadavg 3}
-#${offset 40}Uptime      $uptime_short
-#${offset 190}${voffset -62}CPU
-#${offset 190}${voffset 18}Core1  ${cpugraph cpu1 10,40}
-#
-#${offset 190}Core2  ${offset 1}${cpugraph cpu2 10,40}
-#${offset 290}${voffset -62}Memory
-#${offset 290}${voffset 18}Used   ${color2}[ ${color}$mem${color2} ]${color}
-#${offset 290}$color3${membar 4,80} $color
-#${offset 430}${voffset -62}HDD
-#${offset 430}${voffset 18}root     ${color2}[ ${color}${fs_used /}${color2} ]${color}      home  ${color2}[ ${color}${fs_used /home}${color2} ]${color}
-##${offset 430}daten    ${color2}[ ${color}${fs_used /media/disk2part1}${color2} ]${color}
-#${offset 660}${voffset -62}Network
-#${offset 660}${voffset 18}ip          ${color2}[ ${color}${addr wlan0}${color2} ]${color}
-#${offset 1780}${voffset -62}${time %A,  %e. %B}
-#${offset 1810}${voffset 18}${font NeoSans:size=20:style:bold}${time %H}:${font NeoSans:size=10}${offset -10}${voffset -10}${color2}${time %M}${color}
