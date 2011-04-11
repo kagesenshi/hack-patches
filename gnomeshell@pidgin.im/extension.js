@@ -1,3 +1,13 @@
+/* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
+
+/*
+ * Pidgin GnomeShell Integration.
+ *
+ * Credits to the author of Gajim extension as this extension code was modified
+ * from it.
+ *
+ */
+
 const DBus = imports.dbus;
 const Gettext = imports.gettext.domain('gnome-shell');
 const GLib = imports.gi.GLib;
