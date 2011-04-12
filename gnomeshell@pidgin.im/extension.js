@@ -36,6 +36,37 @@ function wrappedText(text, sender, timestamp, direction) {
     };
 }
 
+
+function PidginNotification(source) {
+    this._init(source);
+}
+
+function _fixText(text) {
+    // remove A HREF
+    let _text = text.replace(/<A HREF=".*?">(.*?)<\/A>/g, '$1');
+    return _text;
+}
+
+PidginNotification.prototype = {
+    __proto__: TelepathyClient.Notification.prototype,
+
+    appendMessage: function(message, noTimestamp, styles) {
+        let messageBody = _fixText(message.text);
+        styles = styles || [];
+        styles.push(message.direction);
+
+        if (message.messageType == Tp.ChannelTextMessageType.ACTION) {
+            let senderAlias = GLib.markup_escape_text(message.sender, -1);
+            messageBody = '<i>%s</i> %s'.format(senderAlias, messageBody);
+            styles.push('chat-action');
+        }
+
+        this.update(this.source.title, messageBody, { customContent: true, bannerMarkup: true });
+        this._append(messageBody, styles, message.timestamp, noTimestamp);
+    }
+
+}
+
 function Source(client, conversation, initialMessage) {
     this._init(client, conversation, initialMessage);
 }
@@ -61,7 +92,8 @@ Source.prototype = {
         this._initialMessage = initialMessage;
         this._iconUri = 'file:///usr/share/icons/hicolor/48x48/apps/pidgin.png'; // use this icon as default
         this._presence = 'online';
-        this._notification = new TelepathyClient.Notification(this);
+//        this._notification = new TelepathyClient.Notification(this);
+        this._notification = new PidginNotification(this);
         this._notification.setUrgency(MessageTray.Urgency.HIGH);
 
 
@@ -82,7 +114,7 @@ Source.prototype = {
         // Start!
         //
 
-        this.title = proxy.PurpleBuddyGetAliasSync(this._author_buddy);
+        this.title = GLib.markup_escape_text(proxy.PurpleBuddyGetAliasSync(this._author_buddy));
 
         this._setSummaryIcon(this.createNotificationIcon());
 
@@ -179,7 +211,7 @@ Source.prototype = {
         if (buddy != this._author_buddy) return;
 
         this._presence = 'offline';
-        this._notification.appendPresence(': <i>offline</i>', false);
+        this._notification.appendPresence(': <i>' + this.title + ' have signed off</i>', false);
     },
 
     _onDeleteConversation: function(emitter, conversation) {
