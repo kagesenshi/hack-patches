@@ -24,6 +24,8 @@ const TelepathyClient = imports.ui.telepathyClient;
 
 const _ = Gettext.gettext;
 
+const DEBUG=true;
+
 function wrappedText(text, sender, timestamp, direction) {
     return {
         messageType: Tp.ChannelTextMessageType.NORMAL,
@@ -57,7 +59,7 @@ Source.prototype = {
         this._account = account;
         this._conversation = conversation;
         this._initialMessage = initialMessage;
-        this._iconUri = null;
+        this._iconUri = 'file:///usr/share/icons/hicolor/48x48/apps/pidgin.png'; // use this icon as default
         this._presence = 'online';
         this._notification = new TelepathyClient.Notification(this);
         this._notification.setUrgency(MessageTray.Urgency.HIGH);
@@ -70,10 +72,12 @@ Source.prototype = {
                 this._initialMessage = proxy.PurpleConversationMessageGetMessageSync(messageobj);
             }
         };
-        
-        this._iconUri = 'file://' + proxy.PurpleBuddyIconGetFullPathSync(proxy.PurpleBuddyGetIconSync(this._author_buddy));
+       
+        let iconobj = proxy.PurpleBuddyGetIconSync(this._author_buddy);
 
-        global.log(this._iconUri);
+        if (iconobj) {
+            this._iconUri = 'file://' + proxy.PurpleBuddyIconGetFullPathSync(iconobj);
+        };
 
         // Start!
         //
@@ -266,9 +270,11 @@ function patchSynchronousMethods(obj, iface) {
             let name = method.name + 'Sync';
             obj[name] = function () {
                 let arg_array = Array.prototype.slice.call(arguments);
-                logmsg = 'calling ' + method.name + ' with parameters ' + arg_array + ' arguments ' + arguments;
-                log(logmsg);
-                global.log(logmsg); 
+                let logmsg = 'calling ' + method.name + ' with parameters ' + arg_array + ' arguments ' + arguments;
+                if (DEBUG) {
+                    log(logmsg);
+                    global.log(logmsg); 
+                }
                 return obj._dbusBus.call(
                     obj._dbusBusName,
                     obj._dbusPath,
