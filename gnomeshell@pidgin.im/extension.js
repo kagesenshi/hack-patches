@@ -34,21 +34,26 @@ function wrappedText(text, sender, timestamp, direction) {
     };
 }
 
-function Source(client, account, author, initialMessage, conversation) {
-    this._init(client, account, author, initialMessage, conversation);
+function Source(client, conversation, initialMessage) {
+    this._init(client, conversation, initialMessage);
 }
 
 Source.prototype = {
     __proto__: MessageTray.Source.prototype,
 
-    _init: function(client, account, author, initialMessage, conversation) {
+    _init: function(client, conversation, initialMessage) {
+        let proxy = client.proxy();
+
+        let account = proxy.PurpleConversationGetAccountSync(conversation);
+        let author = proxy.PurpleConversationGetNameSync(conversation);
+        let author_buddy = proxy.PurpleFindBuddySync(account, author);
         MessageTray.Source.prototype._init.call(this, author);
+
+
         this.isChat = true;
         this._author = author;
+        this._author_buddy = author_buddy;
         this._client = client;
-
-        let proxy = this._client.proxy();
-
         this._account = account;
         this._conversation = conversation;
         this._initialMessage = initialMessage;
@@ -56,10 +61,34 @@ Source.prototype = {
         this._presence = 'online';
         this._notification = new TelepathyClient.Notification(this);
         this._notification.setUrgency(MessageTray.Urgency.HIGH);
+
+
+        if (!this._initialMessage) {
+            let history = proxy.PurpleConversationGetMessageHistorySync(this._conversation);
+            let messageobj = history[history.length - 1];
+            if (messageobj) {
+                this._initialMessage = proxy.PurpleConversationMessageGetMessageSync(messageobj);
+            }
+        };
         
-        this._iconUri = 'file://' + proxy.PurpleBuddyIconGetFullPathSync(proxy.PurpleConvImGetIconSync(proxy.PurpleConvImSync(this._conversation)));
+        this._iconUri = 'file://' + proxy.PurpleBuddyIconGetFullPathSync(proxy.PurpleBuddyGetIconSync(this._author_buddy));
 
         global.log(this._iconUri);
+
+        // Start!
+        //
+
+        this.title = proxy.PurpleBuddyGetAliasSync(this._author_buddy);
+
+        this._setSummaryIcon(this.createNotificationIcon());
+
+        if (this._initialMessage) {
+            let message = wrappedText(this._initialMessage, this._author, null, TelepathyClient.NotificationDirection.RECEIVED);
+            this._notification.appendMessage(message, false);
+        }
+
+        if (!Main.messageTray.contains(this))
+            Main.messageTray.add(this);
 
         this._buddyStatusChangeId = proxy.connect('BuddyStatusChanged', Lang.bind(this, this._onBuddyStatusChange));
         this._buddySignedOffId = proxy.connect('BuddySignedOff', Lang.bind(this, this._onBuddySignedOff));
@@ -67,20 +96,7 @@ Source.prototype = {
         this._messageSentId = proxy.connect('SentImMsg', Lang.bind(this, this._onSentImMessage));
         this._messageReceivedId = proxy.connect('ReceivedImMsg', Lang.bind(this, this._onReceivedImMessage));
 
-
-        // Start!
-        //
-
-        this.title = proxy.PurpleConversationGetNameSync(this._conversation);
-
-        this._setSummaryIcon(this.createNotificationIcon());
-        let message = wrappedText(this._initialMessage, this._author, null, TelepathyClient.NotificationDirection.RECEIVED);
-        this._notification.appendMessage(message, false);
-        if (!Main.messageTray.contains(this))
-            Main.messageTray.add(this);
-
         this.notify(this._notification);
-
     },
 
     destroy: function () {
@@ -133,7 +149,7 @@ Source.prototype = {
 
 
     respond: function(text) {
-        proxy = this._client.proxy();
+        let proxy = this._client.proxy();
         proxy.PurpleConvImSendRemote(proxy.PurpleConvImSync(this._conversation), text);
     },
 
@@ -141,25 +157,25 @@ Source.prototype = {
         if (!this.title) return;
 
         let proxy = this._client.proxy();
-        let buddy_alias = proxy.PurpleBuddyGetAliasSync(buddy);
 
-        if (buddy_alias != this._author) return;
+        if (buddy != this._author_buddy) return;
 
         // XXX: this looks wrong. should get string?
         let old_status = proxy.PurpleStatusGetIdSync(old_status_id);
         let new_status = proxy.PurpleStatusGetIdSync(new_status_id);
 
+        if (this._presence == old_status) return;
+
         this._presence = new_status;
-        this._notification.appendPresence(new_status, false);
+        this._notification.appendPresence(': <i>' + new_status + '</i>', false);
 
     },
 
     _onBuddySignedOff: function(emitter, buddy) {
-        let buddy_alias = proxy.PurpleBuddyGetAliasSync(buddy);
-        if (buddy_alias != this._author) return;
+        if (buddy != this._author_buddy) return;
 
         this._presence = 'offline';
-        this._notification.appendPresence('offline', false);
+        this._notification.appendPresence(': <i>offline</i>', false);
     },
 
     _onDeleteConversation: function(emitter, conversation) {
@@ -170,26 +186,19 @@ Source.prototype = {
 
     _onSentImMessage: function(emitter, account, author, text) {
 
+        let proxy = this._client.proxy();
         let buddy = proxy.PurpleFindBuddySync(account, author);
-        if (buddy) {
-            author = proxy.PurpleBuddyGetAliasSync(buddy);
-        }
 
-        if (text && (author == this._author)) {
+        if (text && (buddy == this._author_buddy)) {
             let message = wrappedText(text, this._author, null, TelepathyClient.NotificationDirection.SENT);
             this._notification.appendMessage(message, false);
         }
 
     },
 
-    _onReceivedImMessage: function(emitter, account, author, text) {
+    _onReceivedImMessage: function(emitter, account, author, text, conversation) {
 
-        let buddy = proxy.PurpleFindBuddySync(account, author);
-        if (buddy) {
-            author = proxy.PurpleBuddyGetAliasSync(buddy);
-        }
-
-        if (text && (author == this._author)) {
+        if (text && (this._conversation == conversation)) {
             let message = wrappedText(text, this._author, null, TelepathyClient.NotificationDirection.RECEIVED);
             this._notification.appendMessage(message, false);
             this.notify(this._notification);
@@ -213,10 +222,14 @@ const PidginIface = {
         {name: 'PurpleBuddyGetName', inSignature: 'i', outSignature: 's'},
         {name: 'PurpleStatusGetId', inSignature: 'i', outSignature: 's'},
         {name: 'PurpleBuddyIconGetFullPath', inSignature: 'i', outSignature: 's'},
+        {name: 'PurpleBuddyGetIcon', inSignature: 'i', outSignature: 'i'},
         {name: 'PurpleConvImSend', inSignature: 'is', outSignature: ''},
         {name: 'PurpleConvIm', inSignature: 'i', outSignature: 'i'},
         {name: 'PurpleConvImGetIcon', inSignature: 'i', outSignature: 'i'},
-        {name: 'PurpleConversationGetName', inSignature: 'i', outSignature: 's'}
+        {name: 'PurpleConversationGetName', inSignature: 'i', outSignature: 's'},
+        {name: 'PurpleConversationGetAccount', inSignature: 'i', outSignature: 's'},
+        {name: 'PurpleConversationGetMessageHistory', inSignature: 'i', outSignature: 'ai'},
+        {name: 'PurpleConversationMessageGetMessage', inSignature: 'i', outSignature: 's'}
     ],
     signals: [
         {name: 'ReceivedImMsg', inSignature: 'issiu'},
@@ -224,7 +237,8 @@ const PidginIface = {
         {name: 'BuddyStatusChanged', inSignature: 'iii'}, // ????
         {name: 'BuddySignedOff', inSignature: 'i'},
         {name: 'BuddySignedOn', inSignature: 'i'},
-        {name: 'DeletingConversation', inSignature: 'i'}
+        {name: 'DeletingConversation', inSignature: 'i'},
+        {name: 'ConversationCreated', inSignature: 'i'}
     ]
 };
 
@@ -252,8 +266,9 @@ function patchSynchronousMethods(obj, iface) {
             let name = method.name + 'Sync';
             obj[name] = function () {
                 let arg_array = Array.prototype.slice.call(arguments);
-                log('calling ' + method.name + ' with parameters ' + arg_array + ' arguments ' + 
-                    arguments); 
+                logmsg = 'calling ' + method.name + ' with parameters ' + arg_array + ' arguments ' + arguments;
+                log(logmsg);
+                global.log(logmsg); 
                 return obj._dbusBus.call(
                     obj._dbusBusName,
                     obj._dbusPath,
@@ -281,29 +296,40 @@ PidginClient.prototype = {
         this._proxy = new Pidgin(DBus.session, 'im.pidgin.purple.PurpleService', '/im/pidgin/purple/PurpleObject');
         patchSynchronousMethods(this._proxy, PidginIface);
         this._proxy.connect('ReceivedImMsg', Lang.bind(this, this._messageReceived));
+        this._proxy.connect('ConversationCreated', Lang.bind(this, this._conversationCreated));
     },
 
     proxy: function () {
         return this._proxy;
     },
 
-    _messageReceived: function(emitter, account, author, message, conversation) {
-        let proxy = this.proxy()
-
-        let buddy = proxy.PurpleFindBuddySync(account, author);
-        if (buddy) {
-            author = proxy.PurpleBuddyGetAliasSync(buddy);
-        }
-
-        let source = this._sources[author];
+    _conversationCreated: function (emitter, conversation) {
+        let proxy = this.proxy();
+        let source = this._sources[conversation];
         if (!source) {
-            source = new Source(this, account, author, message, conversation);
-            source.connect('destroy', Lang.bind(this, 
-                function() {
-                    delete this._sources[author];
+            source = new Source(this, conversation);
+            source.connect('destroy', Lang.bind(this,
+                function () {
+                    delete this._sources[conversation];
                 }
             ));
-            this._sources[author] = source;
+        };
+        this._sources[conversation] = source;
+    },
+
+    _messageReceived: function(emitter, account, author, message, conversation, flags) {
+
+        if (conversation) {
+            let source = this._sources[conversation];
+            if (!source) {
+                source = new Source(this, conversation, message);
+                source.connect('destroy', Lang.bind(this, 
+                    function() {
+                        delete this._sources[conversation];
+                    }
+                ));
+            }
+            this._sources[conversation] = source;
         }
     }
 }
