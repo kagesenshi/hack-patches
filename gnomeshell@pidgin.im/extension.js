@@ -114,7 +114,7 @@ Source.prototype = {
         // Start!
         //
 
-        this.title = GLib.markup_escape_text(proxy.PurpleBuddyGetAliasSync(this._author_buddy));
+        this.title = GLib.markup_escape_text(proxy.PurpleBuddyGetAliasSync(this._author_buddy), -1);
 
         this._setSummaryIcon(this.createNotificationIcon());
 
