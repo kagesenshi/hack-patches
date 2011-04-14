@@ -251,6 +251,7 @@ const PidginIface = {
     methods: [
         {name: 'PurpleGetIms', inSignature: '', outSignature: 'ai'},
         {name: 'PurpleAccountsGetAllActive', inSignature: '', outSignature: 'ai'},
+        {name: 'PurpleConversationGetType', inSignature: 'i', outSignature: 'u'},
         {name: 'PurpleFindBuddies', inSignature: 'is', outSignature: 'ai'},
         {name: 'PurpleFindBuddy', inSignature: 'is', outSignature: 'i'},
         {name: 'PurpleAccountGetAlias', inSignature: 'i', outSignature: 's'},
@@ -345,6 +346,10 @@ PidginClient.prototype = {
 
     _conversationCreated: function (emitter, conversation) {
         let proxy = this.proxy();
+        if (proxy.PurpleConversationGetTypeSync(conversation) != 1) {
+            return
+        };
+
         let source = this._sources[conversation];
         if (!source) {
             source = new Source(this, conversation);
