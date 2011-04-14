@@ -186,7 +186,8 @@ Source.prototype = {
 
     respond: function(text) {
         let proxy = this._client.proxy();
-        proxy.PurpleConvImSendRemote(proxy.PurpleConvImSync(this._conversation), text);
+        let _text = GLib.markup_escape_text(text, -1);
+        proxy.PurpleConvImSendRemote(proxy.PurpleConvImSync(this._conversation), _text);
     },
 
     _onBuddyStatusChange: function (emitter, buddy, old_status_id, new_status_id) {
