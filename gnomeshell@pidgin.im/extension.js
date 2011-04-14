@@ -42,8 +42,8 @@ function PidginNotification(source) {
 }
 
 function _fixText(text) {
-    // remove A HREF
-    let _text = text.replace(/<A HREF=".*?">(.*?)<\/A>/g, '$1');
+    // remove all tags
+    let _text = text.replace(/<\/?[^>]+(>|$)/g, "");
     return _text;
 }
 
