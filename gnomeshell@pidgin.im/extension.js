@@ -203,7 +203,7 @@ Source.prototype = {
         if (this._presence == old_status) return;
 
         this._presence = new_status;
-        this._notification.appendPresence(': <i>' + new_status + '</i>', false);
+        this._notification.appendPresence('<i>' + this.title + 'is now ' + new_status + '</i>', false);
 
     },
 
@@ -211,7 +211,7 @@ Source.prototype = {
         if (buddy != this._author_buddy) return;
 
         this._presence = 'offline';
-        this._notification.appendPresence(': <i>' + this.title + ' have signed off</i>', false);
+        this._notification.appendPresence('<i>' + this.title + ' have signed off</i>', false);
     },
 
     _onDeleteConversation: function(emitter, conversation) {
