@@ -114,7 +114,7 @@ Source.prototype = {
         // Start!
         //
 
-        this.title = GLib.markup_escape_text(proxy.PurpleBuddyGetAliasSync(this._author_buddy), -1);
+        this.title = GLib.markup_escape_text(proxy.PurpleConversationGetTitleSync(this._conversation), -1);
 
         this._setSummaryIcon(this.createNotificationIcon());
 
@@ -265,7 +265,8 @@ const PidginIface = {
         {name: 'PurpleConversationGetName', inSignature: 'i', outSignature: 's'},
         {name: 'PurpleConversationGetAccount', inSignature: 'i', outSignature: 's'},
         {name: 'PurpleConversationGetMessageHistory', inSignature: 'i', outSignature: 'ai'},
-        {name: 'PurpleConversationMessageGetMessage', inSignature: 'i', outSignature: 's'}
+        {name: 'PurpleConversationMessageGetMessage', inSignature: 'i', outSignature: 's'},
+        {name: 'PurpleConversationGetTitle', inSignature: 'i', outSignature: 's'},
     ],
     signals: [
         {name: 'ReceivedImMsg', inSignature: 'issiu'},
