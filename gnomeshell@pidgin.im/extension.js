@@ -132,7 +132,9 @@ Source.prototype = {
         this._messageSentId = proxy.connect('SentImMsg', Lang.bind(this, this._onSentImMessage));
         this._messageReceivedId = proxy.connect('ReceivedImMsg', Lang.bind(this, this._onReceivedImMessage));
 
-        this.notify(this._notification);
+        if (this._initialMessage) {
+            this.notify(this._notification);
+        }
     },
 
     destroy: function () {
@@ -164,6 +166,9 @@ Source.prototype = {
     open: function(notification) {
         // Lookup for the messages window and display it. In the case where it's not o
         // opened yet fallback to the roster window.
+
+        /* disable this, it doesnt quite work correctly with default pidgin
+         * config anyway
         let windows = global.get_window_actors();
         for (let i = 0; i < windows.length; i++) {
             let metaWindow = windows[i].metaWindow;
@@ -172,7 +177,7 @@ Source.prototype = {
                 Main.activateWindow(metaWindow);
                 return;
             }
-        }
+        }*/
 
         let app = Shell.AppSystem.get_default().get_app('pidgin.desktop');
         app.activate_window(null, global.get_current_time());
