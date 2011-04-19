@@ -132,9 +132,7 @@ Source.prototype = {
         this._messageSentId = proxy.connect('SentImMsg', Lang.bind(this, this._onSentImMessage));
         this._messageReceivedId = proxy.connect('ReceivedImMsg', Lang.bind(this, this._onReceivedImMessage));
 
-        if (this._initialMessage) {
-            this.notify(this._notification);
-        }
+        this.notify(this._notification);
     },
 
     destroy: function () {
@@ -206,9 +204,10 @@ Source.prototype = {
         let old_status = proxy.PurpleStatusGetIdSync(old_status_id);
         let new_status = proxy.PurpleStatusGetIdSync(new_status_id);
 
-        if (this._presence == old_status) return;
-
+        if (this._presence == new_status) return;
         this._presence = new_status;
+
+        if (new_status == 'dnd') new_status = 'busy';
         this._notification.appendPresence('<i>' + this.title + ' is now ' + new_status + '</i>', false);
 
     },
