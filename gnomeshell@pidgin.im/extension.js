@@ -9,24 +9,19 @@
  */
 
 const DBus = imports.dbus;
-const Gettext = imports.gettext.domain('gnome-shell');
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
-const Signals = imports.signals;
 const St = imports.gi.St;
-const Tp = imports.gi.TelepathyGLib;
-
 const Main = imports.ui.main;
-const Mainloop = imports.mainloop;
 const MessageTray = imports.ui.messageTray;
 const Shell = imports.gi.Shell;
 const TelepathyClient = imports.ui.telepathyClient;
 
+const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
 function wrappedText(text, sender, timestamp, direction) {
     return {
-        messageType: Tp.ChannelTextMessageType.NORMAL,
         text: text,
         sender: sender,
         timestamp: timestamp,
@@ -55,7 +50,6 @@ PidginNotification.prototype = {
         this.update(this.source.title, messageBody, { customContent: true, bannerMarkup: true });
         this._append(messageBody, styles, message.timestamp, noTimestamp);
     }
-
 }
 
 function Source(client, account, author, initialMessage, conversation, flag) {
@@ -66,51 +60,78 @@ Source.prototype = {
     __proto__: MessageTray.Source.prototype,
 
     _init: function(client, account, author, initialMessage, conversation, flag) {
+
         let proxy = client.proxy();
-
-        let author_buddy = proxy.PurpleFindBuddySync(account, author);
-        MessageTray.Source.prototype._init.call(this, author);
-
-
-        this.isChat = true;
-        this._author = author;
-        this._author_buddy = author_buddy;
         this._client = client;
+        this._author = author;
         this._account = account;
         this._conversation = conversation;
         this._initialMessage = initialMessage;
+        this._initialFlag = flag;
         this._iconUri = null;
         this._presence = 'online';
+        this.isChat = true;
         this._notification = new PidginNotification(this);
         this._notification.setUrgency(MessageTray.Urgency.HIGH);
 
-        let iconobj = proxy.PurpleBuddyGetIconSync(this._author_buddy);
 
+        proxy.PurpleFindBuddyRemote(account, author, Lang.bind(this, this._async_set_author_buddy))
+    },
+
+    _async_set_author_buddy: function (author_buddy) {
+        let proxy = this._client.proxy();
+        this._author_buddy = author_buddy;
+        proxy.PurpleConvImRemote(this._conversation, Lang.bind(this, this._async_set_conversation_im));
+    },
+
+    _async_set_conversation_im: function (conversation_im) {
+        let proxy = this._client.proxy();
+        this._conversation_im = conversation_im;
+        proxy.PurpleConversationGetTitleRemote(this._conversation, Lang.bind(this, this._async_set_title));
+    },
+
+    _async_set_title: function (title) {
+        let proxy = this._client.proxy();
+        this.title = _fixText(title);
+        proxy.PurpleBuddyGetIconRemote(this._author_buddy, Lang.bind(this, this._async_get_icon));
+    },
+
+    _async_get_icon: function (iconobj) {
+        let proxy = this._client.proxy();
         if (iconobj) {
-            this._iconUri = 'file://' + proxy.PurpleBuddyIconGetFullPathSync(iconobj);
-        };
+            proxy.PurpleBuddyIconGetFullPathRemote(iconobj, Lang.bind(this, this._async_set_icon));
+        } else {
+            this._start();
+        }
+    },
 
-        // Start!
-        //
+    _async_set_icon: function (iconpath) {
+        this._iconUri = 'file://' + iconpath;
+        this._start();
+    },
 
-        this.title = GLib.markup_escape_text(proxy.PurpleConversationGetTitleSync(this._conversation), -1);
+    _start: function () {
+
+        let proxy = this._client.proxy();
+        MessageTray.Source.prototype._init.call(this, this.title);
 
         this._setSummaryIcon(this.createNotificationIcon());
 
         Main.messageTray.add(this);
 
         let direction = null;
-        if (flag == 1) {
+        if (this._initialFlag == 1) {
             direction = TelepathyClient.NotificationDirection.SENT;
-        } else if (flag == 2) {
+        } else if (this._initialFlag == 2) {
             direction = TelepathyClient.NotificationDirection.RECEIVED;
         }
 
         let message = wrappedText(this._initialMessage, this._author, null, direction);
-        this._notification.appendMessage(message, false);
+        this._notification.appendMessage(message, true);
 
         this._buddyStatusChangeId = proxy.connect('BuddyStatusChanged', Lang.bind(this, this._onBuddyStatusChange));
         this._buddySignedOffId = proxy.connect('BuddySignedOff', Lang.bind(this, this._onBuddySignedOff));
+        this._buddySignedOnId = proxy.connect('BuddySignedOn', Lang.bind(this, this._onBuddySignedOn));
         this._deleteConversationId = proxy.connect('DeletingConversation', Lang.bind(this, this._onDeleteConversation));
         this._messageDisplayedId = proxy.connect('DisplayedImMsg', Lang.bind(this, this._onDisplayedImMessage));
 
@@ -121,6 +142,7 @@ Source.prototype = {
         let proxy = this._client.proxy();
         proxy.disconnect(this._buddyStatusChangeId);
         proxy.disconnect(this._buddySignedOffId);
+        proxy.disconnect(this._buddySignedOnId);
         proxy.disconnect(this._deleteConversationId);
         proxy.disconnect(this._messageSentId);
         proxy.disconnect(this._messageReceivedId);
@@ -155,31 +177,79 @@ Source.prototype = {
     respond: function(text) {
         let proxy = this._client.proxy();
         let _text = GLib.markup_escape_text(text, -1);
-        proxy.PurpleConvImSendRemote(proxy.PurpleConvImSync(this._conversation), _text);
+        proxy.PurpleConvImSendRemote(this._conversation_im, _text);
     },
 
     _onBuddyStatusChange: function (emitter, buddy, old_status_id, new_status_id) {
         if (!this.title) return;
 
+        let self = this;
+
         let proxy = this._client.proxy();
 
         if (buddy != this._author_buddy) return;
 
-        // XXX: this looks wrong. should get string?
-        let new_status = proxy.PurpleStatusGetIdSync(new_status_id);
+        let presenceInfo = {};
 
-        if (this._presence == new_status) return;
-        this._presence = new_status;
+        let notify_presence = function () {
 
-        if (new_status == 'dnd') new_status = 'busy';
-        this._notification.appendPresence('<i>' + this.title + ' is now ' + new_status + '</i>', false);
+            let presence = presenceInfo.presence;
+            let message = presenceInfo.message;
+            if (self._presence == presence) return;
+    
+            let title = self.title;
+            let presenceMessage, shouldNotify;
+            if (presence == "away") {
+                presenceMessage = _("%s is away.").format(title);
+            } else if (presence == "available") {
+                presenceMessage = _("%s is available.").format(title);
+            } else if (presence == "dnd") {
+                presenceMessage = _("%s is busy.").format(title);
+            } else {
+                return;
+            }
+    
+            self._presence = presence;
+    
+            if (message)
+                presenceMessage += ' <i>(' + _fixText(message) + ')</i>';
+    
+            self._notification.appendPresence(presenceMessage, false);
+        };
+ 
+        let set_presence_message = function (message) {
+            presenceInfo.message = message;
+            notify_presence();
+        };
+        let set_presence = function (presence) {
+            presenceInfo.presence = presence;
+            proxy.PurpleStatusGetAttrStringRemote(new_status_id, 'message', set_presence_message);
+        };
+
+        proxy.PurpleStatusGetIdRemote(new_status_id, set_presence);
+
     },
 
     _onBuddySignedOff: function(emitter, buddy) {
         if (buddy != this._author_buddy) return;
 
+        let shouldNotify = this._presence != 'offline';
+        let presenceMessage = _("%s is offline.").format(this.title);
+        this._notification.appendPresence(presenceMessage, shouldNotify);
         this._presence = 'offline';
-        this._notification.appendPresence('<i>' + this.title + ' have signed off</i>', false);
+        if (shouldNotify) 
+            this.notify(this._notification);
+    },
+
+    _onBuddySignedOn: function(emitter, buddy) {
+        if (buddy != this._author_buddy) return;
+
+        let shouldNotify = this._presence == 'offline';
+        let presenceMessage = _("%s is online.").format(this.title);
+        this._notification.appendPresence(presenceMessage, shouldNotify);
+        this._presence = 'online';
+        if (shouldNotify) 
+            this.notify(this._notification);
     },
 
     _onDeleteConversation: function(emitter, conversation) {
@@ -198,13 +268,10 @@ Source.prototype = {
                 direction = TelepathyClient.NotificationDirection.RECEIVED;
             }
             if (direction != null) {
-                let message = wrappedText(text, this._author, null, direction);
-                this._notification.appendMessage(message, false);
+                let message = wrappedText(text, author, null, direction);
+                this._notification.appendMessage(message, true);
                 this.notify(this._notification);
-            } else {
-                this._notification.appendPresence(message, false)
             }
-
         }
 
     }
@@ -225,6 +292,7 @@ const PidginIface = {
         {name: 'PurpleBuddyGetAlias', inSignature: 'i', outSignature: 's'},
         {name: 'PurpleBuddyGetName', inSignature: 'i', outSignature: 's'},
         {name: 'PurpleStatusGetId', inSignature: 'i', outSignature: 's'},
+        {name: 'PurpleStatusGetAttrString', inSignature: 'is', outSignature: 's'},
         {name: 'PurpleBuddyIconGetFullPath', inSignature: 'i', outSignature: 's'},
         {name: 'PurpleBuddyGetIcon', inSignature: 'i', outSignature: 'i'},
         {name: 'PurpleConvImSend', inSignature: 'is', outSignature: ''},
@@ -326,6 +394,7 @@ PidginClient.prototype = {
 }
 
 
-function main() {
+function main(metadata) {
+    imports.gettext.bindtextdomain('gnome-shell-extensions', metadata.localedir);
     let client = new PidginClient();
 }
