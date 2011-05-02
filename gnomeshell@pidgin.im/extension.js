@@ -21,6 +21,10 @@ const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
 function wrappedText(text, sender, timestamp, direction) {
+    let currentTime = (Date.now() / 1000);
+    if (timestamp == null) {
+        timestamp = currentTime;
+    };
     return {
         text: text,
         sender: sender,
@@ -73,6 +77,7 @@ Source.prototype = {
         this.isChat = true;
         this._notification = new PidginNotification(this);
         this._notification.setUrgency(MessageTray.Urgency.HIGH);
+        this._notification.enableScrolling(true);
 
 
         proxy.PurpleFindBuddyRemote(account, author, Lang.bind(this, this._async_set_author_buddy))
@@ -118,6 +123,7 @@ Source.prototype = {
         this._setSummaryIcon(this.createNotificationIcon());
 
         Main.messageTray.add(this);
+        this.pushNotification(this._notification);
 
         let direction = null;
         if (this._initialFlag == 1) {
@@ -127,7 +133,7 @@ Source.prototype = {
         }
 
         let message = wrappedText(this._initialMessage, this._author, null, direction);
-        this._notification.appendMessage(message, true);
+        this._notification.appendMessage(message, false);
 
         this._buddyStatusChangeId = proxy.connect('BuddyStatusChanged', Lang.bind(this, this._onBuddyStatusChange));
         this._buddySignedOffId = proxy.connect('BuddySignedOff', Lang.bind(this, this._onBuddySignedOff));
@@ -135,7 +141,7 @@ Source.prototype = {
         this._deleteConversationId = proxy.connect('DeletingConversation', Lang.bind(this, this._onDeleteConversation));
         this._messageDisplayedId = proxy.connect('DisplayedImMsg', Lang.bind(this, this._onDisplayedImMessage));
 
-        this.notify(this._notification);
+        this.notify();
     },
 
     destroy: function () {
@@ -172,6 +178,7 @@ Source.prototype = {
 
     notify: function () {
         MessageTray.Source.prototype.notify.call(this, this._notification);
+        this._notification.scrollTo(St.Side.BOTTOM);
     },
 
     respond: function(text) {
@@ -238,7 +245,7 @@ Source.prototype = {
         this._notification.appendPresence(presenceMessage, shouldNotify);
         this._presence = 'offline';
         if (shouldNotify) 
-            this.notify(this._notification);
+            this.notify();
     },
 
     _onBuddySignedOn: function(emitter, buddy) {
@@ -249,7 +256,7 @@ Source.prototype = {
         this._notification.appendPresence(presenceMessage, shouldNotify);
         this._presence = 'online';
         if (shouldNotify) 
-            this.notify(this._notification);
+            this.notify();
     },
 
     _onDeleteConversation: function(emitter, conversation) {
@@ -269,8 +276,11 @@ Source.prototype = {
             }
             if (direction != null) {
                 let message = wrappedText(text, author, null, direction);
-                this._notification.appendMessage(message, true);
-                this.notify(this._notification);
+                this._notification.appendMessage(message, false);
+            }
+
+            if (direction == TelepathyClient.NotificationDirection.RECEIVED) {
+                this.notify();
             }
         }
 
@@ -318,45 +328,6 @@ const PidginIface = {
 
 let Pidgin = DBus.makeProxyClass(PidginIface);
 
-function patchSynchronousMethods(obj, iface) {
-    if ('methods' in iface) {
-        let methods = iface.methods;
-
-        for (let i = 0; i < methods.length; ++i) {
-            let method = methods[i];
-
-            if (!('name' in method))
-                throw new Error("Method definition must have a name");
-
-            if (!('outSignature' in method))
-                method.outSignature = "a{sv}";
-
-            if (!("inSignature" in method))
-                method.inSignature = "a{sv}";
-
-            if (!("timeout" in method))
-                method.timeout = -1;
-
-            let name = method.name + 'Sync';
-            obj[name] = function () {
-                let arg_array = Array.prototype.slice.call(arguments);
-                return obj._dbusBus.call(
-                    obj._dbusBusName,
-                    obj._dbusPath,
-                    obj._dbusInterface,
-                    method.name,
-                    method.outSignature,
-                    method.inSignature,
-                    false,
-                    1000,
-                    arg_array || []
-                );
-            }
-        }
-    }
-    return obj;
-}
-
 function PidginClient() {
     this._init();
 }
@@ -365,7 +336,6 @@ PidginClient.prototype = {
     _init: function() {
         this._sources = {};
         this._proxy = new Pidgin(DBus.session, 'im.pidgin.purple.PurpleService', '/im/pidgin/purple/PurpleObject');
-        patchSynchronousMethods(this._proxy, PidginIface);
         this._proxy.connect('DisplayedImMsg', Lang.bind(this, this._messageDisplayed));
     },
 
